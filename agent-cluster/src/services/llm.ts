@@ -68,7 +68,7 @@ export class LLMService {
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
         ],
-        temperature: 0.3,
+        temperature: 1,
         response_format: { type: 'json_object' }
       });
 
@@ -154,7 +154,7 @@ export class LLMService {
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
         ],
-        temperature: 0.5,
+        temperature: 1,
         response_format: { type: 'json_object' }
       });
 
@@ -211,7 +211,7 @@ export class LLMService {
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
         ],
-        temperature: 0.3,
+        temperature: 1,
         response_format: { type: 'json_object' }
       });
 
@@ -242,7 +242,7 @@ export class LLMService {
     const response = await this.client.chat.completions.create({
       model: this.model,
       messages,
-      temperature: 0.7
+      temperature: 1
     });
 
     return response.choices[0]?.message?.content || '';
