@@ -15,7 +15,7 @@ export class Storage implements IStorage {
 
   private constructor() {
     this.basePath = process.env.AGENT_CLUSTER_STORAGE || './data';
-    this.agentsPath = path.join(this.basePath, 'agents');
+    this.agentsPath = path.join(process.cwd(), 'agents');
     this.statesPath = path.join(this.basePath, 'states');
     this.contextsPath = path.join(this.basePath, 'contexts');
   }
