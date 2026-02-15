@@ -79,9 +79,18 @@ export class LLMService {
 
       // 解析 JSON 响应
       const parsed = JSON.parse(content);
-      const subTasks = Array.isArray(parsed) ? parsed : parsed.tasks || parsed.subTasks || [];
+      console.log('[LLM] Raw response:', JSON.stringify(parsed).substring(0, 500));
+      
+      // 尝试多种可能的字段名
+      let subTasks = parsed;
+      if (!Array.isArray(parsed)) {
+        subTasks = parsed.tasks || parsed.subTasks || parsed.subtasks || 
+                   parsed.taskList || parsed.data || parsed.result || 
+                   parsed.items || parsed.steps || parsed.actions || [];
+      }
 
       if (!Array.isArray(subTasks) || subTasks.length === 0) {
+        console.warn('[LLM] No tasks found in response, using default');
         throw new Error('Invalid response format: expected array of tasks');
       }
 
