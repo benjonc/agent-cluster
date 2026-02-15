@@ -214,7 +214,7 @@ export interface IStorage {
  * 根Agent 特有接口
  */
 export interface IRootAgent extends IAgent {
-  decomposeTask(task: ITask): ITask[];  // 拆解任务
+  decomposeTask(task: ITask): Promise<ITask[]>;  // 拆解任务（异步，调用LLM）
   dispatchTask(subTask: ITask, targetAgent?: IAgent): Promise<ITaskResult>;
   aggregateResults(results: ITaskResult[]): ITaskResult;
 }

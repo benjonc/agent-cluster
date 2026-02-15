@@ -33,6 +33,7 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
+    "openai": "^4.0.0",
     "uuid": "^9.0.0"
   }
 }

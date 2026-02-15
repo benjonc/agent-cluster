@@ -7,6 +7,7 @@ import {
   AgentStatus
 } from '../types';
 import { Agent } from './Agent';
+import { LLMService, getLLMService } from '../services/llm';
 
 /**
  * 子Agent
@@ -14,6 +15,7 @@ import { Agent } from './Agent';
  */
 export class ChildAgent extends Agent implements IChildAgent {
   private agentMdContent?: string;
+  private llmService: LLMService;
 
   constructor(config: IAgentConfig) {
     super({
@@ -21,6 +23,7 @@ export class ChildAgent extends Agent implements IChildAgent {
       type: AgentType.CHILD,
       template: config.template || 'ChildAgent'
     });
+    this.llmService = getLLMService();
   }
 
   /**
@@ -45,55 +48,55 @@ export class ChildAgent extends Agent implements IChildAgent {
   public async executeTask(task: ITask): Promise<ITaskResult> {
     this.updateStatus(AgentStatus.RUNNING);
     this.currentTask = task;
-    
+
     await this.addExecutionLog('task_start', `Starting task: ${task.description}`);
-    
+
     try {
       // 1. 验证任务上下文（确保只接收明确指令）
       if (!this.validateTaskContext(task)) {
         throw new Error('Invalid task context: missing required instruction');
       }
-      
-      // 2. 执行任务
-      const output = await this.performTask(task);
-      
-      // 3. 自测
-      await this.addExecutionLog('self_test', 'Running self-test...');
+
+      // 2. 使用LLM执行任务
+      const executionResult = await this.performTask(task);
+
+      // 3. 使用LLM进行自测
+      await this.addExecutionLog('self_test', 'Running self-test with LLM...');
       const selfTestPassed = await this.selfTest();
-      
+
       if (!selfTestPassed) {
         throw new Error('Self-test failed');
       }
-      
+
       await this.addExecutionLog('self_test_passed', 'Self-test passed');
-      
+
       // 4. 构建结果
       const result: ITaskResult = {
         taskId: task.id,
         success: true,
-        output,
+        output: executionResult,
         completedAt: new Date(),
         selfTestPassed: true
       };
-      
+
       this.updateStatus(AgentStatus.COMPLETED);
       await this.reportResult(result);
       await this.reportToParent(result);
-      
+
       return result;
-      
+
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       await this.addExecutionLog('error', `Error: ${errorMessage}`);
       this.recordError(errorMessage);
-      
+
       // 检查是否进入错误循环
       if (this.isInErrorLoop()) {
         this.updateStatus(AgentStatus.ERROR_LOOP);
       } else {
         this.updateStatus(AgentStatus.FAILED);
       }
-      
+
       const result: ITaskResult = {
         taskId: task.id,
         success: false,
@@ -101,44 +104,71 @@ export class ChildAgent extends Agent implements IChildAgent {
         completedAt: new Date(),
         selfTestPassed: false
       };
-      
+
       await this.reportResult(result);
       await this.reportToParent(result);
-      
+
       return result;
     }
   }
 
   /**
    * 自测
-   * 验证任务执行结果是否符合预期
+   * 使用LLM验证任务执行结果是否符合预期
    */
   public async selfTest(): Promise<boolean> {
-    // TODO: 实现具体的自测逻辑
-    // 可以基于 Agent.md 中的测试规范
-    
     if (!this.currentTask) {
       return false;
     }
-    
+
+    try {
+      // 获取执行结果（从上下文或最后结果中获取）
+      const lastOutput = this.context.executionLog
+        .filter(log => log.action === 'task_executed')
+        .pop()?.result || '';
+
+      // 调用LLM进行自测验证
+      const testResult = await this.llmService.selfTest(
+        this.currentTask.description,
+        lastOutput
+      );
+
+      await this.addExecutionLog(
+        testResult.passed ? 'self_test_passed' : 'self_test_failed',
+        testResult.feedback
+      );
+
+      return testResult.passed;
+
+    } catch (error) {
+      await this.addExecutionLog('self_test_error', `Self-test error: ${error}`);
+      // 出错时回退到基础自测
+      return this.fallbackSelfTest();
+    }
+  }
+
+  /**
+   * 基础自测（降级方案）
+   */
+  private fallbackSelfTest(): boolean {
+    if (!this.currentTask) {
+      return false;
+    }
+
     try {
       // 基础自测：检查结果是否存在
-      // 实际应根据任务类型进行更详细的验证
-      
       const testCases = this.extractTestCases();
-      
+
       for (const testCase of testCases) {
-        const passed = await this.runTestCase(testCase);
+        const passed = testCase.validate();
         if (!passed) {
-          await this.addExecutionLog('self_test_failed', `Self-test case failed: ${testCase.name}`);
           return false;
         }
       }
-      
+
       return true;
-      
+
     } catch (error) {
-      await this.addExecutionLog('self_test_error', `Self-test error: ${error}`);
       return false;
     }
   }
@@ -188,25 +218,33 @@ export class ChildAgent extends Agent implements IChildAgent {
 
   /**
    * 执行具体任务逻辑
-   * TODO: 根据任务类型实现具体逻辑
+   * 使用LLM执行任务并返回结果
    */
   private async performTask(task: ITask): Promise<any> {
-    // 基于 Agent.md 的指导执行任务
     const instruction = task.context?.instruction || task.description;
-    
+
     await this.addExecutionLog('perform_task', `Performing: ${instruction}`);
-    
-    // TODO: 实现具体的任务执行逻辑
-    // 这里是一个占位实现
-    
-    return {
-      agentId: this.id,
-      taskId: task.id,
-      instruction,
-      executedAt: new Date(),
-      // 实际执行结果
-      result: `Task "${instruction}" completed by ${this.name}`
-    };
+
+    try {
+      // 调用LLM执行任务
+      const result = await this.llmService.executeTask(instruction, task.context);
+
+      const output = {
+        agentId: this.id,
+        taskId: task.id,
+        instruction,
+        executedAt: new Date(),
+        llmResult: result
+      };
+
+      await this.addExecutionLog('task_executed', result.output);
+
+      return output;
+
+    } catch (error) {
+      await this.addExecutionLog('task_error', `Error: ${error}`);
+      throw error;
+    }
   }
 
   /**

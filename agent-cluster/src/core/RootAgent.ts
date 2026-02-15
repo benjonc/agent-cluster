@@ -9,6 +9,7 @@ import {
 } from '../types';
 import { Agent } from './Agent';
 import { v4 as uuidv4 } from 'uuid';
+import { LLMService, getLLMService } from '../services/llm';
 
 /**
  * 根Agent
@@ -17,6 +18,7 @@ import { v4 as uuidv4 } from 'uuid';
 export class RootAgent extends Agent implements IRootAgent {
   private taskQueue: ITask[];
   private results: Map<string, ITaskResult>;
+  private llmService: LLMService;
 
   constructor(config: IAgentConfig) {
     super({
@@ -27,6 +29,7 @@ export class RootAgent extends Agent implements IRootAgent {
     
     this.taskQueue = [];
     this.results = new Map();
+    this.llmService = getLLMService();
   }
 
   /**
@@ -45,8 +48,8 @@ export class RootAgent extends Agent implements IRootAgent {
     this.currentTask = task;
     
     try {
-      // 1. 使用LLM拆解任务
-      const subTasks = this.decomposeTask(task);
+      // 1. 使用LLM拆解任务（现在返回Promise）
+      const subTasks = await this.decomposeTask(task);
       
       // 2. 为每个子任务创建子Agent或分配给现有Agent
       const subTaskResults: ITaskResult[] = [];
@@ -110,12 +113,47 @@ export class RootAgent extends Agent implements IRootAgent {
 
   /**
    * 使用LLM拆解任务
-   * 这里使用模拟实现，实际应调用LLM API
+   * 调用Kimi API进行智能任务拆解
    */
-  public decomposeTask(task: ITask): ITask[] {
-    // TODO: 集成LLM API进行任务拆解
-    // 当前为简化实现，将任务拆分为2-3个子任务
+  public async decomposeTask(task: ITask): Promise<ITask[]> {
+    await this.addExecutionLog('decompose_start', `Decomposing task: ${task.description}`);
     
+    try {
+      // 调用LLM服务进行任务拆解
+      const subTaskList = await this.llmService.decomposeTask(task.description);
+      
+      // 转换为ITask格式
+      const subTasks: ITask[] = subTaskList.map((subTask, index) => ({
+        id: uuidv4(),
+        description: subTask.description,
+        context: {
+          parentTaskId: task.id,
+          step: index + 1,
+          totalSteps: subTaskList.length,
+          originalContext: task.context,
+          subTaskId: subTask.id,
+          priority: subTask.priority,
+          dependencies: subTask.dependencies
+        },
+        parentTaskId: task.id,
+        createdAt: new Date()
+      }));
+      
+      await this.addExecutionLog('decompose_complete', `Decomposed into ${subTasks.length} subtasks`);
+      
+      return subTasks;
+      
+    } catch (error) {
+      await this.addExecutionLog('decompose_error', `Error: ${error}`);
+      // 出错时返回默认拆解
+      return this.fallbackDecomposeTask(task);
+    }
+  }
+
+  /**
+   * 默认任务拆解（降级方案）
+   */
+  private fallbackDecomposeTask(task: ITask): ITask[] {
     const subTasks: ITask[] = [];
     const descriptions = this.analyzeTaskDescription(task.description);
     
