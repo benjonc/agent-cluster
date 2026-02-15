@@ -8,15 +8,19 @@ export class LLMService {
   private client: OpenAI;
   private model: string;
 
-  constructor(apiKey?: string, model: string = 'kimi-k2-5') {
-    const key = apiKey || process.env.KIMI_API_KEY;
+  constructor(
+    apiKey?: string,
+    model: string = 'kimi-for-coding',
+    baseURL: string = 'https://api.kimi.com/coding/v1'
+  ) {
+    const key = apiKey || process.env.KIMI_API_KEY || process.env.KIMI_FOR_CODING_API_KEY;
     if (!key) {
-      throw new Error('KIMI_API_KEY is required. Please set it in environment variables.');
+      throw new Error('KIMI_API_KEY or KIMI_FOR_CODING_API_KEY is required. Please set it in environment variables.');
     }
 
     this.client = new OpenAI({
       apiKey: key,
-      baseURL: 'https://api.moonshot.cn/v1',
+      baseURL: baseURL,
     });
     this.model = model;
   }

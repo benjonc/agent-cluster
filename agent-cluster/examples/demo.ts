@@ -20,9 +20,9 @@ async function main() {
     process.exit(1);
   }
 
-  // 初始化 LLM 服务
+  // 初始化 LLM 服务（Kimi for Coding）
   console.log('📡 初始化 LLM 服务...');
-  const llmService = new LLMService(apiKey);
+  const llmService = new LLMService(apiKey, 'kimi-for-coding', 'https://api.kimi.com/coding/v1');
   setLLMService(llmService);
   console.log('✅ LLM 服务初始化完成\n');
 
