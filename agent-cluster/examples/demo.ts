@@ -1,5 +1,5 @@
 import { RootAgent } from '../src/core/RootAgent';
-import { ITask } from '../src/types';
+import { ITask, AgentType } from '../src/types';
 import { v4 as uuidv4 } from 'uuid';
 import { setLLMService, LLMService } from '../src/services/llm';
 
@@ -30,6 +30,7 @@ async function main() {
   console.log('🤖 创建 RootAgent...');
   const rootAgent = new RootAgent({
     name: 'root-agent',
+    type: AgentType.ROOT,
     description: '根Agent - 负责任务拆解和协调',
     maxRetries: 3,
     timeout: 120000,
