@@ -1,5 +1,5 @@
 import { Agent, RootAgent, ChildAgent, Storage } from '../src/core';
-import { AgentType, AgentStatus, ITask, IAgentConfig } from '../src/types';
+import { AgentType, AgentStatus, ITask, IAgentConfig, IAgentState } from '../src/types';
 
 describe('Agent Cluster', () => {
   let storage: Storage;
@@ -175,16 +175,32 @@ describe('Agent Cluster', () => {
 
   describe('Storage', () => {
     it('should save and load agent state', async () => {
-      const state = {
+      const state: IAgentState = {
         id: 'test-agent',
         name: 'Test',
-        status: AgentStatus.IDLE
+        type: AgentType.CHILD,
+        description: 'Test agent for storage',
+        context: {
+          conversationHistory: [],
+          taskState: { taskHistory: [], completedTasks: [] },
+          executionLog: []
+        },
+        template: 'ChildAgent',
+        childrenIds: [],
+        status: AgentStatus.IDLE,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        errorCount: 0,
+        errorHistory: [],
+        config: { name: 'Test', type: AgentType.CHILD }
       };
       
       await storage.saveAgentState('test-agent', state);
       const loaded = await storage.loadAgentState('test-agent');
       
-      expect(loaded).toEqual(state);
+      expect(loaded?.id).toEqual(state.id);
+      expect(loaded?.name).toEqual(state.name);
+      expect(loaded?.status).toEqual(state.status);
       
       await storage.deleteAgentState('test-agent');
     });

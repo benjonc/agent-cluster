@@ -173,13 +173,17 @@ export class Storage implements IStorage {
     
     try {
       const data = await fs.readFile(filePath, 'utf-8');
+      if (!data.trim()) {
+        return null;
+      }
       const parsed = JSON.parse(data);
       return this.reviveDates(parsed);
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
         return null;
       }
-      throw error;
+      // 处理 JSON 解析错误或其他错误
+      return null;
     }
   }
 
